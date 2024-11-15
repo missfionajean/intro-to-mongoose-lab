@@ -15,6 +15,9 @@ const mongoose = require("mongoose");
 // imports prompt-sync package
 const prompt = require("prompt-sync")();
 
+// importing process package
+const process = require("process");
+
 /* ----------------------------------------------------------- */
 /* ------------------- Database Connection ------------------- */
 /* ----------------------------------------------------------- */
@@ -38,12 +41,10 @@ connect();
 const menuChoice = () => {
 	console.log("\nWelcome to the CRM. What would you like to do?\n");
 	console.log("1. Create Customer");
-	console.log("2. View Customers");
-	console.log("3. Update Customer");
-	console.log("4. Delete Customer");
-	console.log("5. Quit\n");
+	console.log("2. Search - View, Update or Delete");
+	console.log("3. Quit\n");
 	console.log("[Select a # and press ENTER]");
-	return prompt("> ");
+	return prompt("> ").trim();
 };
 
 const runQueries = async () => {
@@ -55,22 +56,17 @@ const runQueries = async () => {
 			await viewCust();
 			break;
 		case "3":
-			await updateCust();
-			break;
-		case "4":
-			await deleteCust();
-			break;
-		case "5":
 			await exitCRM();
 			break;
 		default:
+			console.log("Invalid selection. Please select a valid option!");
 			await runQueries();
 			break;
 	}
 };
 
 // display entries to user to catch and correct errors
-const checkEntry = async (entry) => {
+const checkEntry = async (entry, action, id = "N/A") => {
 	console.log(`\nIs this info correct?`);
 	console.log(`${entry.FIRSTNAME}`);
 	console.log(`${entry.LASTNAME}`);
@@ -82,15 +78,27 @@ const checkEntry = async (entry) => {
 	console.log("[Select a # and press ENTER]");
 
 	// switch statement
-	switch (prompt("> ")) {
+	switch (prompt("> ").trim()) {
 		case "1":
-			await CRM.create(entry);
+			if (action === "create") {
+				await CRM.create(entry);
+			} else if (action === "update") {
+				await CRM.findByIdAndUpdate(id, entry, { new: true });
+			}
 			break;
 		case "2":
-			await addCust();
+			if (action === "create") {
+				await addCust();
+			} else if (action === "update") {
+				await getUpdates();
+			}
 			break;
 		case "3":
 			await runQueries();
+			break;
+		default:
+			console.log("Invalid selection. Please select a valid option!");
+			await checkEntry(entry, action, id);
 			break;
 	}
 };
@@ -107,29 +115,204 @@ const addCust = async () => {
 	for (const info in customerData) {
 		console.log(`Please type customer's ${info}\n`);
 		console.log("[Press ENTER when finished]");
-		customerData[info] = prompt("> ").trim();
+		customerData[info] = prompt("> ").trim().toLowerCase();
 	}
 
-	// checks entry and routes to correct function
-	await checkEntry(customerData);
-	console.log("Entry complete!\n");
-	console.log("Please choose another option");
+	// routes to checkEntry (action argument "create")
+	await checkEntry(customerData, "create");
+
+	// if successful, notifies user and routes to main menu
+	console.log("Entry complete! Please choose another option:");
 	await runQueries();
 };
 
 const viewCust = async () => {
-	await CRM.find({});
-	console.log();
+	console.log("Filter customers by:\n");
+	console.log("1. Name");
+	console.log("2. Age");
+	console.log("3. Customer ID");
+	console.log("4. View All");
+	console.log("5. Back to menu\n");
+	console.log("[Select a # and press ENTER]");
+
+	let result = "";
+
+	// switch statement
+	switch (prompt("> ").trim()) {
+		case "1":
+			console.log("Please type customer's FIRSTNAME\n");
+			console.log("[Press ENTER when finished]");
+			const first = prompt("> ").trim().toLowerCase();
+			console.log("Please type customer's LASTNAME\n");
+			console.log("[Press ENTER when finished]");
+			const last = prompt("> ").trim().toLowerCase();
+			try {
+				result = await CRM.find(
+					{ FIRSTNAME: first, LASTNAME: last },
+					"FIRSTNAME LASTNAME"
+				);
+				if ((result = [])) {
+					throw "Not found";
+				}
+			} catch (err) {
+				console.log("No matching customer found!");
+				await updateCust();
+			}
+			break;
+		case "2":
+			console.log("Please type customer's AGE\n");
+			console.log("[Press ENTER when finished]");
+			const age = prompt("> ");
+			try {
+				result = await CRM.find({ AGE: age }, "age");
+				if ((result = [])) {
+					throw "Not found";
+				}
+			} catch (err) {
+				console.log("No matching customer found!");
+				await updateCust();
+			}
+			break;
+		case "3":
+			console.log("Please type customer's UNIQUE ID\n");
+			console.log("[Press ENTER when finished]");
+			const custID = prompt("> ");
+			try {
+				result = await CRM.findById(custID);
+			} catch (err) {
+				console.log("No matching customer found!");
+				await updateCust();
+			}
+			break;
+		case "4":
+			result = await CRM.find({});
+			break;
+		case "5":
+			await runQueries();
+			break;
+		default:
+			console.log("Invalid selection. Please select a valid option!");
+			await viewCust();
+			break;
+	}
+
+	// displays search results to user before moving on
+	console.log(result);
+
+	// provided they perform a valid search, directs them to update menu
+	updateCust();
 };
 
+const getUpdates = async () => {
+	// grabs single customer and shows it to user
+	console.log("Please type customer's UNIQUE ID\n");
+	console.log("[Press ENTER when finished]");
+	const custID = prompt("> ").trim();
+
+	// error handling
+	try {
+		await CRM.findById(custID);
+	} catch (err) {
+		console.log("No matching customer found!");
+		await updateCust();
+	}
+
+	// sets up object according to schema
+	const customerData = {
+		FIRSTNAME: "",
+		LASTNAME: "",
+		AGE: 0,
+	};
+
+	// loop to gather inputs for customerData schema
+	for (const info in customerData) {
+		console.log(`Please type customer's ${info}\n`);
+		console.log("[Press ENTER when finished]");
+		customerData[info] = prompt("> ").trim().toLowerCase();
+	}
+
+	// runs checkEntry() with action argument as "update"
+	await checkEntry(customerData, "update", custID);
+
+	// if successful, notifies user and routes to main menu
+	console.log("Update complete! Please choose another option:");
+	await runQueries();
+};
+
+// nest inside view customer for usability (ask after viewing - update? enter userid, enter new info, check entry, back to menu)
 const updateCust = async () => {
-	await CRM.findOneAndUpdate(findinfo, newinfo, { new: true });
-	console.log();
+	console.log("\nWhat would you like to do next?\n");
+	console.log("1. New Search");
+	console.log("2. Update Customer");
+	console.log("3. Delete Customer");
+	console.log("4. Back to menu\n");
+	console.log("[Select a # and press ENTER]");
+
+	// switch statement
+	switch (prompt("> ").trim()) {
+		case "1":
+			await viewCust();
+			break;
+		case "2":
+			// routes to getUpdates(), which is recursive
+			await getUpdates();
+			break;
+		case "3":
+			await deleteCust();
+			break;
+		case "4":
+			await runQueries();
+			break;
+		default:
+			console.log("Invalid selection. Please select a valid option!\n");
+			await updateCust();
+			break;
+	}
 };
 
 const deleteCust = async () => {
-	await CRM.findOneAndDelete(findinfo);
-	console.log();
+	// grabs single customer and shows it to user
+	console.log("Please type customer's UNIQUE ID\n");
+	console.log("[Press ENTER when finished]");
+	const custID = prompt("> ").trim();
+
+	// error handling
+	try {
+		const customer = await CRM.findById(custID);
+	} catch (err) {
+		console.logconsole.log("No matching customer found!");
+		await updateCust();
+	}
+
+	// double-checks deletion to be sure
+	console.log(`\nDelete this customer?`);
+	console.log(customer);
+	console.log("\n1. Yes - Delete");
+	console.log("2. No - Re-enter ID");
+	console.log("3. Back to menu\n");
+	console.log("[Select a # and press ENTER]");
+
+	// switch statement
+	switch (prompt("> ").trim()) {
+		case "1":
+			// deletes single entry matching entered ID
+			await CRM.findByIdAndDelete(custID);
+			break;
+		case "2":
+			await deleteCust();
+			break;
+		case "3":
+			await runQueries();
+			break;
+		default:
+			console.log("Invalid selection. Please try again:\n");
+			await deleteCust();
+			break;
+	}
+
+	// if successful, notifies user and routes to main menu
+	console.log("Customer deleted! Please choose another option:");
+	await runQueries();
 };
 
 const exitCRM = async () => {
@@ -137,5 +320,18 @@ const exitCRM = async () => {
 	await mongoose.disconnect();
 
 	// closes app, bringing us back to the command line
-	process.exit();
+	process.exit(0);
 };
+
+async function readDB(operation) {
+	const results = await operation;
+	results.forEach((item) => {
+		console.log(
+			`id: ${item.id} -- Name: ${item.FIRSTNAME} ${item.LASTNAME}, Age: ${item.LASTNAME}`
+		);
+	});
+}
+
+/* 
+- needs more readable search results
+*/
