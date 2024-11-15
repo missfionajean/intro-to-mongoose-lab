@@ -4,8 +4,9 @@ const mongoose = require("mongoose");
 // defines schema for this collection (instructional object)
 const customerSchema = new mongoose.Schema({
 	// "key: value" pairs
-	name: String,
-	age: Number,
+	FIRSTNAME: String,
+    LASTNAME: String,
+	AGE: Number,
 });
 
 // compiles schema into model (necessary for MongoDB interaction)
