@@ -68,9 +68,9 @@ const runQueries = async () => {
 // display entries to user to catch and correct errors
 const checkEntry = async (entry, action, id = "N/A") => {
 	console.log(`\nIs this info correct?`);
-	console.log(`${entry.FIRSTNAME}`);
-	console.log(`${entry.LASTNAME}`);
-	console.log(`${entry.AGE}\n`);
+	console.log(`First: ${entry.FIRSTNAME}`);
+	console.log(`Last: ${entry.LASTNAME}`);
+	console.log(`Age: ${entry.AGE}\n`);
 
 	console.log("1. Yes - Add to database");
 	console.log("2. No - Enter info again");
@@ -147,11 +147,8 @@ const viewCust = async () => {
 			console.log("[Press ENTER when finished]");
 			const last = prompt("> ").trim().toLowerCase();
 			try {
-				result = await CRM.find(
-					{ FIRSTNAME: first, LASTNAME: last },
-					"FIRSTNAME LASTNAME"
-				);
-				if ((result = [])) {
+				result = await CRM.find({ FIRSTNAME: first, LASTNAME: last });
+				if (result.length === 0) {
 					throw "Not found";
 				}
 			} catch (err) {
@@ -164,8 +161,8 @@ const viewCust = async () => {
 			console.log("[Press ENTER when finished]");
 			const age = prompt("> ");
 			try {
-				result = await CRM.find({ AGE: age }, "age");
-				if ((result = [])) {
+				result = await CRM.find({ AGE: age });
+				if (result.length === 0) {
 					throw "Not found";
 				}
 			} catch (err) {
@@ -179,6 +176,9 @@ const viewCust = async () => {
 			const custID = prompt("> ");
 			try {
 				result = await CRM.findById(custID);
+				if (result.length === 0) {
+					throw "Not found";
+				}
 			} catch (err) {
 				console.log("No matching customer found!");
 				await updateCust();
@@ -197,7 +197,7 @@ const viewCust = async () => {
 	}
 
 	// displays search results to user before moving on
-	console.log(result);
+	readDB(result);
 
 	// provided they perform a valid search, directs them to update menu
 	updateCust();
@@ -209,13 +209,22 @@ const getUpdates = async () => {
 	console.log("[Press ENTER when finished]");
 	const custID = prompt("> ").trim();
 
+	// defining customer variable to prevent scope issue
+	let customer = "";
+
 	// error handling
 	try {
-		await CRM.findById(custID);
+		customer = await CRM.findById(custID);
 	} catch (err) {
 		console.log("No matching customer found!");
 		await updateCust();
 	}
+
+	// displays file to be updated
+	console.log("\nCustomer to be updated:");
+	console.log(
+		`ID: ${customer.id} -- Name: ${customer.FIRSTNAME} ${customer.LASTNAME}, Age: ${customer.AGE}\n`
+	);
 
 	// sets up object according to schema
 	const customerData = {
@@ -243,9 +252,10 @@ const getUpdates = async () => {
 const updateCust = async () => {
 	console.log("\nWhat would you like to do next?\n");
 	console.log("1. New Search");
-	console.log("2. Update Customer");
-	console.log("3. Delete Customer");
-	console.log("4. Back to menu\n");
+	console.log("2. Create Customer");
+	console.log("3. Update Customer");
+	console.log("4. Delete Customer");
+	console.log("5. Back to menu\n");
 	console.log("[Select a # and press ENTER]");
 
 	// switch statement
@@ -254,13 +264,16 @@ const updateCust = async () => {
 			await viewCust();
 			break;
 		case "2":
+			await addCust();
+			break;
+		case "3":
 			// routes to getUpdates(), which is recursive
 			await getUpdates();
 			break;
-		case "3":
+		case "4":
 			await deleteCust();
 			break;
-		case "4":
+		case "5":
 			await runQueries();
 			break;
 		default:
@@ -276,17 +289,21 @@ const deleteCust = async () => {
 	console.log("[Press ENTER when finished]");
 	const custID = prompt("> ").trim();
 
+	let customer = "";
+
 	// error handling
 	try {
-		const customer = await CRM.findById(custID);
+		customer = await CRM.findById(custID);
 	} catch (err) {
-		console.logconsole.log("No matching customer found!");
+		console.log("No matching customer found!");
 		await updateCust();
 	}
 
 	// double-checks deletion to be sure
 	console.log(`\nDelete this customer?`);
-	console.log(customer);
+	console.log(
+		`ID: ${customer.id} -- Name: ${customer.FIRSTNAME} ${customer.LASTNAME}, Age: ${customer.AGE}`
+	);
 	console.log("\n1. Yes - Delete");
 	console.log("2. No - Re-enter ID");
 	console.log("3. Back to menu\n");
@@ -323,15 +340,16 @@ const exitCRM = async () => {
 	process.exit(0);
 };
 
-async function readDB(operation) {
-	const results = await operation;
-	results.forEach((item) => {
+async function readDB(data) {
+	try {
+		data.forEach((item) => {
+			console.log(
+				`ID: ${item.id} -- Name: ${item.FIRSTNAME} ${item.LASTNAME}, Age: ${item.AGE}`
+			);
+		});
+	} catch (err) {
 		console.log(
-			`id: ${item.id} -- Name: ${item.FIRSTNAME} ${item.LASTNAME}, Age: ${item.LASTNAME}`
+			`ID: ${data.id} -- Name: ${data.FIRSTNAME} ${data.LASTNAME}, Age: ${data.AGE}`
 		);
-	});
+	}
 }
-
-/* 
-- needs more readable search results
-*/
