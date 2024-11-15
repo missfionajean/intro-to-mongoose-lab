@@ -81,7 +81,14 @@ const checkEntry = async (entry, action, id = "N/A") => {
 	switch (prompt("> ").trim()) {
 		case "1":
 			if (action === "create") {
-				await CRM.create(entry);
+				try {
+					await CRM.create(entry);
+				} catch (err) {
+					console.log(
+						"Input error! Make sure AGE is in numerical digits only.\n"
+					);
+					await addCust();
+				}
 			} else if (action === "update") {
 				await CRM.findByIdAndUpdate(id, entry, { new: true });
 			}
